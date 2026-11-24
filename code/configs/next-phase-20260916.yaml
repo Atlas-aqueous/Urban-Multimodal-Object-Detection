@@ -1,0 +1,105 @@
+version: 1
+date: '2026-09-16'
+status: superseded_by_rf48_implementation
+active_config: configs/rf48-mm.yaml
+active_queue: scripts/run_rf48.py
+active_status: runs/formal/rf48/pipeline-status.json
+superseded_note: Below is the archived 4-7 day plan, not the active experiment matrix.
+plan: docs/reports/2026-09-16-next-phase-plan.md
+scope: single_model_trimodal_detection
+reference:
+  experiment: E9
+  official_score_user_reported: 55.5370
+  historical_ultralytics_score: 54.58204402220287
+  weights: runs/formal/e9-yolov8l-p2-1280-aggressive-b4/weights/best.pt
+  weights_sha256: 1218022c9d0cf8002fd129a765655c48c2646ff32de70c91999d4c73a87952c9
+  submission: runs/formal/submissions/phase1-e9-l-p2-i1280-c0p4-n0p4.zip
+  submission_sha256: d1862987f4a84f6e4fbd30add8c6bd93a52328bf20f3cf8e82f2b993344a93b4
+prerequisites:
+  - unified_txt_evaluator_verified_against_coco
+  - legacy_and_rule_metrics_reported_separately
+  - immutable_split_and_label_hashes_saved_at_train_start
+  - raw_loader_legacy_prediction_parity
+  - png_jpg_depth_format_tests
+  - near_duplicate_scene_audit
+  - free_disk_gib_at_least_8
+splits:
+  A: runs/formal/yolov8m-5ch-revised-960/reproducibility/split.json
+  B: runs/formal/splits/seed-3407.json
+  C: runs/formal/splits/seed-2026.json
+  policy: separate_training_from_public_pretrain_per_split_no_cross_split_warmstart
+resources:
+  gpu: RTX_4080_SUPER_32GB
+  concurrent_gpu_experiments: 1
+  target_peak_gib: 26
+  maximum_peak_gib: 28
+  exploratory_gpu_hours_per_run: 8
+  full_program_gpu_hours_budget: [48, 96]
+experiments:
+  - id: D0
+    action: validation_modality_sensitivity
+    weights: reference
+    variants: [all_modalities, zero_ir, zero_depth]
+  - id: E13-C
+    action: equal_budget_e9_finetune_control
+    split: A
+    imgsz: 1280
+    batch: 4
+    epochs: 30
+    patience: 10
+    lr_existing: 0.00001
+    warmup_epochs: 1
+    mosaic: 0
+  - id: E13-F
+    inherit: E13-C
+    action: add_small_ir_and_depth_validity_branches_at_p3_p4
+    residual_init: zero_output_projection
+    lr_new: 0.0001
+    keep_original_5ch_path: true
+    initial_depth_encoding: legacy_u8
+  - id: E14-RGB
+    action: rfdetr_medium_rgb_control_not_for_submission
+    checkpoint: public_coco_apache_designated_to_be_version_pinned
+    resolution: 576
+    batch: 2
+    accumulation_steps: 8
+    freeze_encoder_epochs: 5
+    max_epochs: 100
+    lr_encoder: 0.00001
+    lr_decoder: 0.0001
+    weight_decay: 0.0001
+    short_probe_epochs: 25
+    mosaic: 0
+    mixup: 0
+  - id: E15-MM
+    inherit: E14-RGB
+    action: trimodal_rfdetr_feature_fusion
+    rgb_path: preserve_pretrained_rgb_encoder_and_projector
+    auxiliary_paths: [ir_small_cnn, depth_valid_small_cnn]
+    fusion: p4_gated_residual_zero_output_projection
+    classes: 12
+    followup_resolution_if_promising: 768
+  - id: E16
+    inherit: E15-MM
+    condition: promising_total_ap_but_insufficient_tiny_recall
+    action: add_p3_feature_path_with_explicit_pretrain_compatibility_audit
+  - id: V
+    action: winner_and_e9_baseline_retrained_on_B_C
+    condition: passes_screen_gate_and_resource_budget
+  - id: F
+    action: all_2000_training_single_model_offline_submission
+    condition: passes_cross_split_gate
+gates:
+  units: map_0_to_1_not_display_points
+  metric: shared_evaluator_after_P0_calibration
+  screen_total_gain: 0.005
+  screen_rare_mean_gain: 0.03
+  rare_path_max_total_loss: 0.002
+  cross_split_mean_gain: 0.015
+  cross_split_positive_count: 2
+  cross_split_worst_gain: -0.005
+  official_target_display_score: 60.0
+completed_this_turn:
+  ap_diagnostic: docs/reports/2026-09-16-ap-audit.json
+  cleanup_manifest: docs/reports/2026-09-16-cleanup.json
+  new_training_started: false

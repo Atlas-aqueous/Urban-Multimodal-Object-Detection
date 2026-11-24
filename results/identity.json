@@ -1,0 +1,42 @@
+{
+  "config": {
+    "architecture": "rfdetr-medium-trimodal-p4-earlyfusion-v1",
+    "source_commit": "03aa832eb07126b8bbd0fff45790b1f2ad45be2b",
+    "pretrained": "weights/public/rf-detr-medium.pth",
+    "manifest": "runs/formal/rf48c/all2000-manifest.json",
+    "multimodal": true,
+    "seed": 42,
+    "imgsz": 1280,
+    "batch": 2,
+    "accumulation": 8,
+    "workers": 16,
+    "epochs": 100,
+    "freeze_epochs": 5,
+    "lr_encoder": 1e-05,
+    "lr": 0.0001,
+    "weight_decay": 0.0001,
+    "patience": 0,
+    "max_hours": 12,
+    "select_conf": 0.5,
+    "fusion": "early",
+    "checkpoint_every": 10
+  },
+  "manifest_sha256": "075ee546f1d5bc9f8acb37fe3eaa7aa20fbeb55608fbbf308cb6d08f36a5735b",
+  "split_sha256": "a3b6c93a6ba01666ad45ff4d6d508c028bdb56798bf418b60ab45fc40fac3a72",
+  "preprocess": "native6-linear20m-v1",
+  "classes": [
+    "person",
+    "boat",
+    "animal",
+    "seat",
+    "sign",
+    "bicycle",
+    "car",
+    "ball",
+    "light",
+    "garbage can",
+    "uav",
+    "tricycle"
+  ],
+  "pretrained_sha256": "749ff6071828aaffac63e204c4f4135ed3d6cdae4d702e086c360edc3b5768c8"
+}

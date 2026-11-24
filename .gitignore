@@ -1,0 +1,42 @@
+# ---- 模型权重（单个 132 MiB，超 GitHub 100MB 限制）----
+*.pt
+*.pth
+weights/
+
+# ---- 赛题数据（版权归主办方，不随仓库分发）----
+data/
+datasets/
+visible/
+infrared/
+depth/
+labels/
+*.rar
+
+# ---- 提交产物与运行输出 ----
+runs/
+submissions/
+phase2-submissions/
+staging/
+*.zip
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- 编辑器 / 系统 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ---- 临时 ----
+*.log
+!results/*.log
+
+# ---- macOS 资源分叉 ----
+._*

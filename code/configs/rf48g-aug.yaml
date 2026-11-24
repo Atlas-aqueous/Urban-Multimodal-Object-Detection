@@ -1,0 +1,32 @@
+architecture: rfdetr-medium-trimodal-p4-earlyfusion-v1
+source_commit: 03aa832eb07126b8bbd0fff45790b1f2ad45be2b
+pretrained: weights/public/rf-detr-medium.pth
+# 实验 B：保留 A 划分（可本地验证），但加强数据增强。
+# 动机与 A 相同（对抗过拟合），但用增强等效扩充场景多样性，而非扩充真实数据。
+# 与既有运行唯一的差异就是下面的 augmentation 段（默认值见 src/trimodal_data.DEFAULT_AUG）。
+manifest: runs/formal/rf48/train-manifest.json
+multimodal: true
+seed: 42
+imgsz: 1280
+batch: 2
+accumulation: 8
+workers: 16
+epochs: 100
+freeze_epochs: 5
+lr_encoder: 0.00001
+lr: 0.0001
+weight_decay: 0.0001
+patience: 0
+max_hours: 12
+select_conf: 0.5
+fusion: early
+augmentation:
+  flip: 0.5
+  # 原为 0.8~1.0（只做轻度缩小）；放宽到 0.65 以覆盖更小的目标尺度 ——
+  # 测试集中 11.7% 是 640x360 的 JPG，等效尺度远小于 PNG。
+  scale_lo: 0.65
+  scale_hi: 1.0
+  # 原为 0.1（±10% 亮度对比度）；提高到 0.2
+  bc: 0.2
+  # 原为 0（关闭）；新增 RGB 逐通道增益 ±10%，模拟成像差异，绝不施加到红外/深度
+  color: 0.1

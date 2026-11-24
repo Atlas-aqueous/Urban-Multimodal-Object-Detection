@@ -1,0 +1,108 @@
+baseline:
+  id: E0
+  score: 0.49629789476224756
+  weights: runs/formal/yolov8m-5ch-revised-960/weights/best.pt
+  inference: {imgsz: 960, conf: 0.005, iou: 0.70, max_det: 100}
+
+official_calibration_2026_09_07:
+  submission: runs/formal/submissions/phase1-e0-p3-960-c040-i055.zip
+  local_score: 0.5528247602465499
+  official_score: 0.55185
+  official_gap: -0.0009747602465498544
+  inference: {imgsz: 960, conf: 0.40, iou: 0.55, max_det: 100}
+
+official_calibration_e9_2026_09_07:
+  submission: runs/formal/submissions/phase1-e9-l-p2-i1280-c0p4-n0p4.zip
+  local_score: 0.5458204402220287
+  official_score: 0.55537
+  official_gap: 0.00954955977797134
+  official_gain_over_e0: 0.00352
+  inference: {imgsz: 1280, conf: 0.40, iou: 0.40, max_det: 100}
+  conclusion: "P2/large is underestimated by the current local split; package architecture-diverse candidates even when local ranking is lower."
+
+common_960: &common_960
+  data_mode: 5ch
+  model: runs/formal/pretrain/yolov8m-5ch.pt
+  imgsz: 960
+  batch: 16
+  epochs: 100
+  patience: 20
+  optimizer: AdamW
+  lr0: 0.001
+  lrf: 0.01
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5
+  close_mosaic: 10
+
+screen:
+  - {id: E1, <<: *common_960, modality_dropout: 0.00}
+  - {id: E2, <<: *common_960, modality_dropout: 0.05}
+  - id: E3
+    inherit: best_of_E0_E1_E2
+    close_mosaic: 25
+  - id: E4
+    inherit: E3
+    box: 9.0
+    cls: 0.5
+    dfl: 1.75
+
+main:
+  - {id: E5, inherit: best_screen, model: yolov8m-p3, imgsz: 1280, batch: 8}
+  - {id: E6, inherit: best_screen, model: yolov8m-p2-5ch, imgsz: 1280, batch: 8}
+  - {id: E7, inherit: E6, rare_repeat: {ball: 2, tricycle: 3}}
+  - {id: E8, inherit: E7, data_mode: 6ch, depth_validity_mask: true}
+  - id: E9
+    condition: "E6.map50_95-E5.map50_95 >= 0.015 and E6.peak_gpu_memory_gib <= 26"
+    inherit: E6
+    model: yolov8l-p2-5ch
+    batch: 4
+
+# 2026-09-07 用户授权进行更激进的尝试：保留原始门禁记录，但显式强制执行 E9。
+aggressive_override:
+  e0_highres_search:
+    imgsz: [960, 1152, 1280, 1408, 1536]
+    conf: [0.35, 0.40, 0.45]
+    iou: [0.50, 0.55, 0.60]
+  e9_force_run:
+    enabled: true
+    model: runs/formal/pretrain/yolov8l-p2-5ch.pt
+    data: configs/formal-train-active-unweighted.yaml
+    imgsz: 1280
+    batch: 4
+    oom_fallback_batch: 2
+  # P3/960 在 E0 高分辨率搜索中明显优于 P2/1280，因此增加一条
+  # “更大 backbone，保留已验证头部”的激进候选，在 E9 评估完成后串行。
+  e10_force_run:
+    enabled: true
+    model: runs/formal/pretrain/yolov8l-5ch.pt
+    data: configs/formal-train-active-unweighted.yaml
+    imgsz: 960
+    batch: 8
+    oom_fallback_batch: 4
+    modality_dropout: 0.0
+  e11_weight_interpolation:
+    enabled: true
+    left: runs/formal/yolov8m-5ch-revised-960/weights/best.pt
+    right: runs/formal/e1-dropout-000-p3-960/weights/best.pt
+    alpha_right: [0.25, 0.50, 0.75]
+    initial_probe: {imgsz: 960, conf: 0.40, iou: 0.55}
+    condition_for_full_search: "best_probe.map50_95 > 0.5528247602465499"
+  e12_force_run:
+    enabled: true
+    model: runs/formal/pretrain/yolov8x-p2-5ch.pt
+    data: configs/formal-train-active-unweighted.yaml
+    imgsz: 1280
+    batch: 4
+    oom_fallback_batch: 2
+    modality_dropout: 0.0
+    packaging_gate: "always_package_because_e9_reversed_local_ranking"
+
+gates:
+  screen_total_gain: 0.005
+  rare_mean_gain: 0.03
+  rare_path_max_total_loss: 0.002
+  cross_split_mean_gain: 0.015
+  cross_split_positive_count: 2
+  cross_split_worst_gain: -0.005
+  tie_tolerance: 0.002

@@ -1,0 +1,24 @@
+architecture: rfdetr-medium-trimodal-p4-earlyfusion-v1
+source_commit: 03aa832eb07126b8bbd0fff45790b1f2ad45be2b
+# 关键：pretrained 指向"我们已训好的权重"，而不是公开 COCO 权重。
+# build_detector 会按形状智能加载：分类头（12 类）一并继承，
+# 公开 91 类头才会被丢弃；早融合的 6 通道补丁嵌入也能正确合并。
+pretrained: weights/best-early-ep67.pt
+manifest: runs/formal/rf48/train-manifest.json
+multimodal: true
+seed: 42
+imgsz: 1280
+batch: 2
+accumulation: 8
+workers: 16
+epochs: 30
+# 已经训到收敛，微调不再冻结编码器
+freeze_epochs: 0
+# 从收敛点继续，学习率比从头训练低一个量级
+lr_encoder: 0.000002
+lr: 0.00001
+weight_decay: 0.0001
+patience: 0
+max_hours: 12
+select_conf: 0.5
+fusion: early

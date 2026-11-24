@@ -1,0 +1,26 @@
+architecture: rfdetr-medium-trimodal-p4-earlyfusion-v1
+source_commit: 03aa832eb07126b8bbd0fff45790b1f2ad45be2b
+pretrained: weights/public/rf-detr-medium.pth
+# 实验 A：用全部 2000 张训练（无验证集）。
+# 动机：现有运行只用 1805 张，白扔 195 张（10.8% 数据）；
+# 且训练损失降到 3.74 仍在降、验证口径早已走平 —— 典型过拟合。
+# 留出评测集场景分布不同且分数普遍偏低，因此优化重点是泛化能力。
+manifest: runs/formal/rf48c/all2000-manifest.json
+multimodal: true
+seed: 42
+imgsz: 1280
+batch: 2
+accumulation: 8
+workers: 16
+epochs: 100
+freeze_epochs: 5
+lr_encoder: 0.00001
+lr: 0.0001
+weight_decay: 0.0001
+patience: 0
+max_hours: 12
+select_conf: 0.5
+fusion: early
+# 无验证集时定期存点：本配方两次运行的峰值都在 65~70 轮，
+# 因此交付时优先选 epoch-070.pt（而非最后一轮）。
+checkpoint_every: 10
