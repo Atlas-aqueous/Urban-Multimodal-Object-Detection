@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
-# Linux 服务器一键环境。用法: bash setup_env.sh
+# Install the Linux CUDA environment from the repository root.
 set -euo pipefail
-cd "$(dirname "$0")"
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-# 驱动须兼容 CUDA 12.6 运行时。
-pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirements.txt
-pip freeze > requirements.lock.txt
-python - <<'EOF'
-import torch, ultralytics, cv2
-print("torch", torch.__version__, "| cuda available:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("GPU:", torch.cuda.get_device_name(0), "| 显存 GB:", round(torch.cuda.get_device_properties(0).total_memory/1e9, 1))
-print("ultralytics", ultralytics.__version__)
-EOF
+cd "$(dirname "$0")/.."
+
+python3.12 -m venv .venv
+. .venv/bin/activate
+python -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu126
+python -m pip install -r environment/requirements.txt
+python -m pip install --no-deps rfdetr==1.3.0
+
+RFD_SITE=$(python -c 'from importlib.util import find_spec; from pathlib import Path; print(Path(find_spec("rfdetr").origin).parent.parent)')
+RFD_PATCH="$PWD/environment/rfdetr-1.3.0-rectangular.patch"
+if ! patch -d "$RFD_SITE" -p1 --reverse --dry-run --silent < "$RFD_PATCH" > /dev/null; then
+    patch -d "$RFD_SITE" -p1 --forward < "$RFD_PATCH"
+fi

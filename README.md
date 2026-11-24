@@ -1,6 +1,6 @@
 # Urban Multimodal Object Detection
 
-面向城市场景的三模态（可见光 / 红外 / 深度）目标检测实现，基于 **RF-DETR** 与 DINOv2 骨干。
+面向城市场景的三模态（可见光 / 红外 / 深度）目标检测实现，基于 **RF-DETR** 与 DINOv2 骨干。项目包含第八届 AIC 算法大赛赛题 2 的 RF48 基线，以及半决赛取得 **53.643** 的 RF1029-M。
 
 <p>
 <img alt="python" src="https://img.shields.io/badge/python-3.12-blue">
@@ -9,9 +9,7 @@
 <img alt="license" src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey">
 </p>
 
-本项目提供一套完整的三模态检测工程：从六通道数据编码、双路融合结构、训练与推理管线，
-到**评测口径标定**、离线后处理优化与提交格式校验工具。所有结构改动均保证与纯 RGB
-预训练模型在初始化时刻逐元素等价，因此完整保留预训练能力。
+项目提供六通道数据编码、融合模型、训练与推理入口，以及评测、后处理和提交格式校验工具。
 
 ---
 
@@ -22,6 +20,7 @@
 - **零初始化双路融合** —— 早融合 + P4 门控残差晚融合两条路径，初始化时刻与纯 RGB 模型
   逐元素等价（实测差 `0.000e+00`）。
 - **深度质量加权下采样** —— 避免无效零值污染插值，掩码走最近邻、深度走质量加权。
+- **有效区域感知注意力** —— RF1029-M 在 P4 聚合传感器特征时，使用真实图像区域和深度有效性对注意力加权。
 - **评测口径标定** —— 发现并量化了两种 AP 实现之间 10~13 分的系统性偏差，
   使选型决策从「凭感觉」变为「可标定」。
 - **纯后处理的工作点搜索** —— 阈值与 NMS 调整无需重新推理，零 GPU 成本。
@@ -30,6 +29,8 @@
 ---
 
 ## Architecture
+
+### RF48 基线
 
 ```
                     ┌─────────────────────────────────────────┐
@@ -49,13 +50,21 @@
                  boxes + class scores → conf filter → NMS → TXT
 ```
 
-两条融合路径在初始化时刻均退化为纯 RGB 模型，新模态只贡献梯度。
+RF48 的六通道扩展和门控残差在初始化时使模型与 RGB 对照的输出一致。
+
+### RF1029-M 半决赛模型
+
+沿用六通道早融合和共享检测解码器，画布改为 1728×960。IR 和深度分支分别用图像内容掩码和深度有效掩码修正 P4 交叉注意力，每路各学习一个残差系数。训练和推理细节见 [半决赛方案](docs/semifinal.md)。
 
 ---
 
 ## Results
 
-在 195 张留出验证集上（评测口径见 `docs/method.md` 2.2 节）：
+| 半决赛模型 | 半决赛官方成绩 | 195 张开发集 mAP@50:95（101 点 AP） |
+|---|---:|---:|
+| RF1029-M，第 8 轮，conf 0.40 / NMS 0.55 | **53.643** | 54.06 |
+
+RF48 在 195 张留出验证集上的结果采用 [RF48 方法](docs/method.md) 第 2.2 节中的 Ultralytics AP 口径。
 
 | 模型 | 画布 | 验证集 mAP |
 |---|---|---|
@@ -86,7 +95,8 @@ code/
   configs/        全部实验配置（YAML）
   tests/          自动化测试
 docs/
-  method.md       方法全文（架构 / 训练 / 评测口径 / 消融）
+  method.md       RF48 架构、训练与消融
+  semifinal.md    RF1029-M 方法与复现命令
   method.pdf      方法 PDF
   notes/          工程笔记（口径标定、验证噪声、实现记录）
 analysis/         离线分析工具（提交校验、阈值分析、口径校准）
@@ -100,15 +110,15 @@ results/          训练曲线与模型身份记录
 ## Installation
 
 ```bash
-git clone <repo-url>
-cd urban-multimodal-detection
-python -m venv .venv && . .venv/bin/activate
-pip install -r environment/requirements.txt
+git clone https://github.com/Atlas-aqueous/Urban-Multimodal-Object-Detection.git
+cd Urban-Multimodal-Object-Detection
+bash environment/setup_env.sh
+source .venv/bin/activate
 ```
 
-- Python 3.12 / CUDA 12.x
-- 训练建议单卡 ≥24 GB；推理任意 CUDA 显卡即可
-- Linux 环境使用 `environment/setup_env.sh` 安装 PyTorch 2.13 / CUDA 12.6。原实验环境见 `environment/environment.txt`。
+- Linux、Python 3.12、PyTorch 2.13 / CUDA 12.6
+- 半决赛复现环境为 RTX 4090 24 GB。安装脚本同时应用 RF-DETR 1.3.0 的矩形画布修复。
+- 历史训练环境见 [环境快照](environment/environment.txt)。
 
 ---
 
@@ -131,42 +141,51 @@ pip install -r environment/requirements.txt
 | 4 | Depth | PNG: `clip(d, 0, 20000)/20000`；JPG: `/255` |
 | 5 | DepthValid | 原始深度 `> 0` |
 
-`manifests/` 中的清单记录了样本划分，路径需按实际位置改写；
-每条样本带 `label_sha256`，载入时校验标签未被篡改。
+训练标签采用官方修订版。运行 `python -m scripts.prepare_manifest` 可从本机数据生成清单，并按仓库记录恢复 1805/195 划分、校验预处理后的标签。测试清单通过三模态文件名匹配生成。
 
 ---
 
 ## Usage
 
-### 推理
+### 半决赛 RF1029-M
 
 ```bash
 cd code
+python -m scripts.prepare_manifest --data-root /path/to/phase3 --out ../runs/phase3-input
+python -m scripts.run_rf1029m infer \
+    --manifest ../runs/phase3-input/test-manifest.json \
+    --weights /path/to/RF1029M-ep008.pt --out ../runs/rf1029m
+```
+
+输出包括逐图 TXT、提交 ZIP 和运行摘要。微调、开发集评估和权重校验见 [半决赛复现](docs/semifinal.md)。
+
+### RF48 推理
+
+```bash
+cd code
+python -m scripts.prepare_manifest --data-root /path/to/test --out ../runs/test-input
 python -m src.predict_rfdetr \
-    --weights <model.safetensors> \
-    --sample-manifest ../manifests/train-manifest.json \
-    --out-dir ../runs/raw \
-    --side val --imgsz 1280 --conf 0.001
+    --weights /path/to/best-early-ep67.safetensors \
+    --sample-manifest ../runs/test-input/test-manifest.json \
+    --out-dir ../runs/raw --side test --imgsz 1280 --conf 0.001
+python -m scripts.apply_nms --source ../runs/raw --dest ../runs/final --conf 0.35 --nms 0.6
 ```
 
-### 后处理
+预测先按置信度取全局 top-100。基于相同原始预测，可离线调整更高的置信度阈值和 NMS。
+
+### RF48 训练
+
+在 `code/` 目录执行以下命令。链接中的权重是 RF48 的公开 RF-DETR Medium 初始化权重。
 
 ```bash
-python -m scripts.apply_nms \
-    --source ../runs/raw --dest ../runs/final \
-    --conf 0.35 --nms 0.6
-```
-
-> `output_rows` 的语义是「先取全局 top-100 再按 conf 过滤」，因此
-> `top100 ∩ {conf ≥ t}` 与「直接用阈值 t 推理」的集合完全相同——
-> **调整工作点只需后处理，无需重新推理，也不需要 GPU**。
-
-### 训练
-
-```bash
+mkdir -p weights/public
+curl -fL https://storage.googleapis.com/rfdetr/medium_coco/checkpoint_best_regular.pth \
+    -o weights/public/rf-detr-medium.pth
+python -m scripts.prepare_manifest --data-root /path/to/train \
+    --labels-root /path/to/revised-labels --out runs/formal/rf48
 python -m scripts.run_experiment \
-    --config configs/rf48c-early1280.yaml \
-    --out ../runs/exp1
+    --config configs/rf48c-early1280.yaml --split-manifest runs/formal/rf48/split.json \
+    --out ../runs/rf48c
 ```
 
 | 配置 | 说明 |
@@ -183,14 +202,13 @@ python -m scripts.run_experiment \
 cd code && python -m pytest -q tests/
 ```
 
-覆盖提交格式校验、几何反算一致性、六通道编码与零初始化等价性等。
+覆盖提交格式校验、几何反算、六通道编码与零初始化等价性。早融合测试使用上一节的 RF-DETR Medium 初始化权重。
 
 ---
 
 ## Model Weights
 
-权重不随仓库分发（单文件约 132 MiB，超出 GitHub 单文件 100 MB 限制），
-通过 Release 附件提供：
+RF48 权重通过 Release 附件提供。RF1029-M 推理和微调使用半决赛作品中的权重，文件名及 SHA256 见 [权重说明](docs/semifinal.md#模型权重)。
 
 **下载 → [Releases · v1.0-weights](https://github.com/Atlas-aqueous/urban-multimodal-detection/releases/tag/v1.0-weights)**
 
@@ -212,13 +230,13 @@ cd code && python -m pytest -q tests/
 }
 ```
 
-推理支持同名的 `.safetensors` 和 `.json` 文件。使用仍兼容的 `.pt` 权重时，可通过 `--weights-sha256` 传入表中的完整摘要。
+用法见上文推理示例。使用 Release 权重时，可通过 `--weights-sha256` 传入表中的完整摘要。
 
 ---
 
 ## Engineering Notes
 
-以下几份笔记记录了工程上真正花时间的部分，也是本项目可复用的经验：
+以下笔记记录了 RF48 阶段的实验结果与工程细节。
 
 | 文档 | 内容 |
 |---|---|
@@ -227,24 +245,17 @@ cd code && python -m pytest -q tests/
 | `docs/notes/2026-09-16-rf48-implementation.md` | 融合结构实现与零初始化等价性验证 |
 | `docs/notes/2026-09-04-reproduction-audit.md` | 数据与标签一致性审计 |
 
-### 已验证无效的方向
-
-记录在此，避免重复踩坑：
+### RF48 消融
 
 | 方向 | 结果 |
 |---|---|
-| **切块推理**（2×2，放大 1.75×） | mAP 62.55 → 42.76，全类均匀崩塌 |
-| **提高推理分辨率** 1408 / 1536 / 1664 | 预测与 1280 版重合 91.5~92.7%，几乎无变化 |
+| **切块推理**（2×2，放大 1.75×） | mAP 62.55 → 42.76 |
+| **提高推理分辨率** 1408 / 1536 / 1664 | 预测与 1280 版重合 91.5~92.7% |
 | **原生 1536 训练** | 验证集 60.59 vs 1280 的 61.58 |
 | **深度编码改对数** | 线性编码 5–95% 跨度 0.759，对数仅 0.207，线性更优 |
-| **增加 P3 检测层** | `num_feature_levels` 1→2 破坏 `cross_attn` 权重形状，不可行 |
+| **增加 P3 检测层** | `num_feature_levels` 1→2 改变 `cross_attn` 权重形状 |
 
-### 一条可复用的经验
-
-> **两个模型的预测重合度超过 90% 时，二者的评测分数差通常 <0.2。**
-
-可用 `analysis/compare_submissions.py` 快速评估两个预测集的重合度，
-在大量候选中筛掉"几乎等价"的版本。
+[compare_submissions.py](analysis/compare_submissions.py) 可以按框比较两组提交的重合度。
 
 ---
 

@@ -15,8 +15,6 @@ from src.prepare_data import (NAMES, IMAGE_EXTS, read_image, load_ir_u8,
 
 PREPROCESS_VERSION = "native6-linear20m-v1"
 
-# 训练增强参数。默认值与历史行为逐项一致（bc=0.1 对应 uniform(.9,1.1) 与 ±.05），
-# 因此不传 augmentation 时行为完全不变。
 DEFAULT_AUG = {"flip": .5, "scale_lo": .8, "scale_hi": 1.0, "bc": .1, "color": 0.0}
 
 
@@ -64,7 +62,6 @@ def make_manifest(root, split_path=None, label_root=None):
     for stem in stems:
         row = {"stem": stem, "split": sides[stem], **{m: ix[stem] for m, ix in indexes.items()}}
         if split_path:
-            # Existing derivative labels contain the five documented repairs.
             label = Path(label_root) / sides[stem] / f"{stem}.txt"
             if not label.is_file():
                 raise FileNotFoundError(label)
