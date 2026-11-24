@@ -13,6 +13,7 @@ import yaml
 from torch.utils.data import DataLoader
 
 from src.trimodal_data import TrimodalDataset, collate, sha256, write_json, PREPROCESS_VERSION, load_config
+from src.inference_checkpoint import load_legacy_checkpoint
 from src.trimodal_rfdetr import build_detector, NestedTensor, output_rows
 from src.evaluate_txt import evaluate
 
@@ -125,7 +126,7 @@ def train(config, out_dir, split_manifest, stop_after=None, resume=None):
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, factor)
     start_epoch, best, best_epoch, elapsed_prior = 0, -1., -1, 0.
     if resume:
-        checkpoint = torch.load(resume, map_location="cpu", weights_only=False)
+        checkpoint = load_legacy_checkpoint(resume)
         if checkpoint["identity"] != identity:
             raise ValueError("Checkpoint identity differs")
         model.load_state_dict(checkpoint["model"], strict=True)
@@ -228,7 +229,7 @@ def train(config, out_dir, split_manifest, stop_after=None, resume=None):
     if val_data is None and not (out_dir / "best.pt").exists() and (out_dir / "last.pt").exists():
         # 无验证集时给下游流水线一个可用的 best.pt（取最后一轮）；正式交付建议改用
         # epoch-0XX.pt 中位于已知峰值（65~70 轮）的那一份。
-        final = torch.load(out_dir / "last.pt", map_location="cpu", weights_only=False)
+        final = load_legacy_checkpoint(out_dir / "last.pt")
         save_checkpoint(out_dir / "best.pt",
                         {k: v for k, v in final.items() if k not in {"optimizer", "scheduler", "scaler"}})
     write_json(out_dir / "status.json", {"stage": "finished_or_budget_stop", "best_score": best,

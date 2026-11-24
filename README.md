@@ -116,7 +116,7 @@ bash environment/setup_env.sh
 source .venv/bin/activate
 ```
 
-- Linux、Python 3.12、PyTorch 2.6 / CUDA 12.4
+- Linux、Python 3.12、PyTorch 2.13 / CUDA 12.6
 - 半决赛复现环境为 RTX 4090 24 GB。安装脚本同时应用 RF-DETR 1.3.0 的矩形画布修复。
 - 历史训练环境见 [环境快照](environment/environment.txt)。
 
@@ -165,7 +165,7 @@ python -m scripts.run_rf1029m infer \
 cd code
 python -m scripts.prepare_manifest --data-root /path/to/test --out ../runs/test-input
 python -m src.predict_rfdetr \
-    --weights /path/to/best-early-ep67.pt \
+    --weights /path/to/best-early-ep67.safetensors \
     --sample-manifest ../runs/test-input/test-manifest.json \
     --out-dir ../runs/raw --side test --imgsz 1280 --conf 0.001
 python -m scripts.apply_nms --source ../runs/raw --dest ../runs/final --conf 0.35 --nms 0.6

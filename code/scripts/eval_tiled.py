@@ -148,6 +148,8 @@ def run(weights, manifest, out_dir, grid, overlap, include_full, size, conf, nms
                "rule_map": report["rule_map"],
                "ultralytics_per_class": report["ultralytics_per_class"],
                "tiny_recall50": report.get("tiny_recall50")}
+    if "metadata_sha256" in ckpt:
+        payload["metadata_sha256"] = ckpt["metadata_sha256"]
     out_dir_parent = out_dir.parent
     write_json(out_dir_parent / (out_dir.name + "-score.json"), payload)
     return payload

@@ -26,6 +26,8 @@ def run(weights, manifest, out_dir, side="test", size=768, threshold=.001, zero=
     fingerprint = {"weights_sha256": weights_sha256, "manifest_sha256": sha256(manifest),
                    "side": side, "imgsz": size, "conf": threshold, "zero_modality": zero,
                    "classes": checkpoint["identity"]["classes"], "preprocess": checkpoint["identity"]["preprocess"]}
+    if "metadata_sha256" in checkpoint:
+        fingerprint["metadata_sha256"] = checkpoint["metadata_sha256"]
     out_dir = Path(out_dir)
     if out_dir.exists() and any(out_dir.iterdir()):
         import json

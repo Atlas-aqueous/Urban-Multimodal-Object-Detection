@@ -5,6 +5,8 @@ from pathlib import Path
 
 import torch
 
+from src.inference_checkpoint import load_legacy_checkpoint
+
 
 def checkpoint_model(checkpoint: dict):
     model = checkpoint.get("ema")
@@ -18,8 +20,8 @@ def checkpoint_model(checkpoint: dict):
 def main(args: argparse.Namespace) -> Path:
     if not 0.0 <= args.alpha <= 1.0:
         raise ValueError("--alpha 必须在 [0, 1] 内")
-    left_ckpt = torch.load(args.left, map_location="cpu", weights_only=False)
-    right_ckpt = torch.load(args.right, map_location="cpu", weights_only=False)
+    left_ckpt = load_legacy_checkpoint(args.left)
+    right_ckpt = load_legacy_checkpoint(args.right)
     left = checkpoint_model(left_ckpt)
     right = checkpoint_model(right_ckpt)
     left_state = left.state_dict()

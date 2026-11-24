@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 python3.12 -m venv .venv
 . .venv/bin/activate
-python -m pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+python -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu126
 python -m pip install -r environment/requirements.txt
 python -m pip install --no-deps rfdetr==1.3.0
 
