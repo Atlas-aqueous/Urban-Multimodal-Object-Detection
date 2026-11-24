@@ -14,6 +14,8 @@ from rfdetr.main import populate_args
 from rfdetr.models import build_model, build_criterion_and_postprocessors
 from rfdetr.util.misc import NestedTensor
 
+from src.inference_checkpoint import load_legacy_checkpoint
+
 
 class SensorBranch(nn.Module):
     def __init__(self, channels):
@@ -128,7 +130,7 @@ def build_detector(config, initialize=True):
                                        early_fusion=config.get("fusion", "late") == "early")
     report = {"missing_keys": [], "unexpected_keys": []}
     if initialize:
-        checkpoint = torch.load(config["pretrained"], map_location="cpu", weights_only=False)
+        checkpoint = load_legacy_checkpoint(config["pretrained"])
         state = checkpoint["model"]
         target_state = model.state_dict()
         filtered, resized, skipped = {}, [], []

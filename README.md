@@ -108,7 +108,7 @@ pip install -r environment/requirements.txt
 
 - Python 3.12 / CUDA 12.x
 - 训练建议单卡 ≥24 GB；推理任意 CUDA 显卡即可
-- 推理环境需要 PyTorch 2.6 或以上。Linux 环境安装使用 `environment/setup_env.sh`，原实验环境见 `environment/environment.txt`。
+- Linux 环境使用 `environment/setup_env.sh` 安装 PyTorch 2.13 / CUDA 12.6。原实验环境见 `environment/environment.txt`。
 
 ---
 
@@ -143,7 +143,7 @@ pip install -r environment/requirements.txt
 ```bash
 cd code
 python -m src.predict_rfdetr \
-    --weights <model.pt> \
+    --weights <model.safetensors> \
     --sample-manifest ../manifests/train-manifest.json \
     --out-dir ../runs/raw \
     --side val --imgsz 1280 --conf 0.001
@@ -212,7 +212,7 @@ cd code && python -m pytest -q tests/
 }
 ```
 
-用法见上文推理示例。使用 Release 权重时，可通过 `--weights-sha256` 传入表中的完整摘要。
+推理支持同名的 `.safetensors` 和 `.json` 文件。使用仍兼容的 `.pt` 权重时，可通过 `--weights-sha256` 传入表中的完整摘要。
 
 ---
 

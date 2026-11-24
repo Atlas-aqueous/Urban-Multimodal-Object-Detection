@@ -1,5 +1,6 @@
 numpy==2.1.3
 packaging
+safetensors
 opencv-python==5.0.0.93
 # torch / torchvision 由 setup_env.* 按平台安装（Linux CUDA / Windows CPU），不在此固定
 ultralytics==8.3.253  # 已验证多页TIFF多通道训练/推理；升级需重新做通道回归测试
