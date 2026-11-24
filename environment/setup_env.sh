@@ -5,8 +5,8 @@ cd "$(dirname "$0")"
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-# 固定已验证的 PyTorch 版本；驱动须兼容 CUDA 12.1 运行时。
-pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+# 驱动须兼容 CUDA 12.4 运行时。
+pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 pip install -r requirements.txt
 pip freeze > requirements.lock.txt
 python - <<'EOF'

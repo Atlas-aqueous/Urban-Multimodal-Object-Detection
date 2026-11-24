@@ -108,7 +108,7 @@ pip install -r environment/requirements.txt
 
 - Python 3.12 / CUDA 12.x
 - 训练建议单卡 ≥24 GB；推理任意 CUDA 显卡即可
-- 完整环境：`environment/environment.txt`（`pip freeze` 全量）
+- 推理环境需要 PyTorch 2.6 或以上。Linux 环境安装使用 `environment/setup_env.sh`，原实验环境见 `environment/environment.txt`。
 
 ---
 
@@ -194,12 +194,12 @@ cd code && python -m pytest -q tests/
 
 **下载 → [Releases · v1.0-weights](https://github.com/Atlas-aqueous/urban-multimodal-detection/releases/tag/v1.0-weights)**
 
-| 文件 | 说明 | SHA256 (前 16 位) |
+| 文件 | 说明 | SHA‑256 |
 |---|---|---|
-| `best-early-ep67.pt` | 主模型（早融合 1280 第 67 轮） | `34467cda0e5ff1ec` |
-| `epoch-070.pt` | 全量数据训练，第 70 轮 | `5b320664d532e854` |
-| `epoch-080.pt` | 全量数据训练，第 80 轮 | `7d5fbd25faddc91b` |
-| `epoch-090.pt` | 全量数据训练，第 90 轮 | `460afdacef942490` |
+| `best-early-ep67.pt` | 主模型（早融合 1280 第 67 轮） | `34467cda0e5ff1ec39376ba606d59f1515459a8236ebd8ee39408deb9372af32` |
+| `epoch-070.pt` | 全量数据训练，第 70 轮 | `5b320664d532e85477b3fc70536952928450e3bf49bbc95dda13e4371e0d1044` |
+| `epoch-080.pt` | 全量数据训练，第 80 轮 | `7d5fbd25faddc91b7617d014839691c330051198aebc440132a211ad3185c13c` |
+| `epoch-090.pt` | 全量数据训练，第 90 轮 | `460afdacef942490ce2a94cf731dd3e7d0122b56e15320a797cb042e74d874de` |
 
 检查点内部结构：
 
@@ -212,7 +212,7 @@ cd code && python -m pytest -q tests/
 }
 ```
 
-加载方式见 `code/src/predict_rfdetr.py`。
+用法见上文推理示例。使用 Release 权重时，可通过 `--weights-sha256` 传入表中的完整摘要。
 
 ---
 

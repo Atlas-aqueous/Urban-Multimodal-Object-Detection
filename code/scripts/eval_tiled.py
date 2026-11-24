@@ -29,7 +29,8 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.trimodal_data import decode, load_manifest, sha256, write_json  # noqa: E402
+from src.inference_checkpoint import load_inference_checkpoint  # noqa: E402
+from src.trimodal_data import decode, load_manifest, write_json  # noqa: E402
 from src.trimodal_data import transform  # noqa: E402
 from src.trimodal_rfdetr import build_detector, NestedTensor, output_rows  # noqa: E402
 from scripts.sweep_rf48_postprocess import load_predictions, nms_classwise  # noqa: E402
@@ -73,9 +74,9 @@ def parse_rows(lines):
 
 
 def run(weights, manifest, out_dir, grid, overlap, include_full, size, conf, nms,
-        side="val", max_keep=100, tile_max_side=0):
+        side="val", max_keep=100, tile_max_side=0, *, expected_sha256=None):
     torch.set_num_threads(4)
-    ckpt = torch.load(weights, map_location="cpu", weights_only=False)
+    ckpt, weights_sha256 = load_inference_checkpoint(weights, expected_sha256)
     config = ckpt["identity"]["config"].copy()
     config["manifest"] = str(manifest)
     model, _, _ = build_detector(config, initialize=False)
@@ -137,7 +138,7 @@ def run(weights, manifest, out_dir, grid, overlap, include_full, size, conf, nms
         records.append((stem, gt, pred, h, w))
         per_image.append(len(pred))
     report = score_records(records, require_all_classes=False)
-    payload = {"weights": str(weights), "weights_sha256": sha256(weights)[:16],
+    payload = {"weights": str(weights), "weights_sha256": weights_sha256[:16],
                "manifest": str(manifest), "grid": grid, "overlap": overlap,
                "include_full": include_full, "size": size, "conf": conf, "nms": nms,
                "tile_max_side": tile_max_side,
@@ -155,6 +156,7 @@ def run(weights, manifest, out_dir, grid, overlap, include_full, size, conf, nms
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--weights", default="weights/best-early-ep67.pt")
+    ap.add_argument("--weights-sha256", help="Expected full SHA-256 of the checkpoint")
     ap.add_argument("--manifest", default="runs/formal/rf48/train-manifest.json")
     ap.add_argument("--out-dir", default=None)
     ap.add_argument("--grid", default="2x2", help="例如 1x1 / 2x2 / 3x2")
@@ -175,7 +177,7 @@ def main():
     out_dir = args.out_dir or f"runs/formal/rf48c/tiled/{tag}"
     payload = run(args.weights, args.manifest, out_dir, args.grid, args.overlap,
                   args.include_full, args.size, args.conf, args.nms, args.side,
-                  tile_max_side=args.tile_max_side)
+                  tile_max_side=args.tile_max_side, expected_sha256=args.weights_sha256)
     print(json.dumps({k: v for k, v in payload.items()
                       if k not in ("ultralytics_per_class",)}, ensure_ascii=False, indent=1))
     print("逐类 AP:", [None if p is None else round(p, 4) for p in payload["ultralytics_per_class"]])

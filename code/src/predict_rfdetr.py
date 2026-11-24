@@ -4,15 +4,17 @@ from pathlib import Path
 
 import torch
 
+from src.inference_checkpoint import load_inference_checkpoint
 from src.trimodal_data import sha256, write_json
 from src.trimodal_rfdetr import build_detector
 from src.train_rfdetr import loader, predict
 from src.evaluate_txt import evaluate
 
 
-def run(weights, manifest, out_dir, side="test", size=768, threshold=.001, zero=None):
+def run(weights, manifest, out_dir, side="test", size=768, threshold=.001, zero=None,
+        *, expected_sha256=None):
     torch.set_num_threads(4)
-    checkpoint = torch.load(weights, map_location="cpu", weights_only=False)
+    checkpoint, weights_sha256 = load_inference_checkpoint(weights, expected_sha256)
     config = checkpoint["identity"]["config"].copy()
     if side == "test" and not config["multimodal"]:
         raise ValueError("RGB diagnostic is not a competition submission model")
@@ -21,7 +23,7 @@ def run(weights, manifest, out_dir, side="test", size=768, threshold=.001, zero=
     model.load_state_dict(checkpoint["model"], strict=True)
     model.cuda()
     torch.cuda.reset_peak_memory_stats()
-    fingerprint = {"weights_sha256": sha256(weights), "manifest_sha256": sha256(manifest),
+    fingerprint = {"weights_sha256": weights_sha256, "manifest_sha256": sha256(manifest),
                    "side": side, "imgsz": size, "conf": threshold, "zero_modality": zero,
                    "classes": checkpoint["identity"]["classes"], "preprocess": checkpoint["identity"]["preprocess"]}
     out_dir = Path(out_dir)
@@ -41,6 +43,7 @@ def run(weights, manifest, out_dir, side="test", size=768, threshold=.001, zero=
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--weights", required=True)
+    p.add_argument("--weights-sha256", help="Expected full SHA-256 of the checkpoint")
     p.add_argument("--sample-manifest", required=True)
     p.add_argument("--out-dir", required=True)
     p.add_argument("--side", choices=["val", "test"], default="test")
@@ -48,4 +51,5 @@ if __name__ == "__main__":
     p.add_argument("--conf", type=float, default=.001)
     p.add_argument("--zero-modality", choices=["ir", "depth"])
     args = p.parse_args()
-    print(run(args.weights, args.sample_manifest, args.out_dir, args.side, args.imgsz, args.conf, args.zero_modality))
+    print(run(args.weights, args.sample_manifest, args.out_dir, args.side, args.imgsz, args.conf,
+              args.zero_modality, expected_sha256=args.weights_sha256))
