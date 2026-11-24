@@ -1,0 +1,23 @@
+imgsz: 1728x960
+seed: 42
+attn_pool: 4
+batch: 2
+workers: 4
+cache_images: true
+aug: strong
+sensor_dropout_ir: 0.05
+sensor_dropout_depth: 0.05
+
+epochs: 8
+accumulation: 8
+warmup_updates: 113
+lr_encoder: 0.000002
+lr: 0.00001
+lr_new: 0.001
+weight_decay: 0.0001
+gradient_clip: 0.1
+
+raw_conf: 0.001
+nms_input_conf: 0.35
+nms: 0.55
+conf: 0.40

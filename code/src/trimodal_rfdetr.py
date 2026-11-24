@@ -53,12 +53,7 @@ def patch_embed_projection(module):
 
 
 def extend_patch_embed(backbone, in_channels):
-    """把 DINOv2 patch-embed 的输入通道从 3 扩到 in_channels；新增通道零初始化。
-
-    零初始化保证初始前向与 RGB-only 逐元素一致（与 P4 门控残差同一原理），
-    预训练权重因此完整保留，红外/深度从第 0 步起只贡献梯度。这样
-    scripts/probe_rfdetr.py 的"零残差 == RGB 对照"断言对早融合同样成立。
-    """
+    """保留 RGB 补丁嵌入权重，并将新增通道初始化为零。"""
     owner, projection = patch_embed_projection(backbone)
     if projection.in_channels == in_channels:
         return projection
@@ -73,8 +68,7 @@ def extend_patch_embed(backbone, in_channels):
         if projection.bias is not None:
             widened.bias.copy_(projection.bias)
     owner.embeddings.patch_embeddings.projection = widened
-    # Dinov2WithRegistersPatchEmbeddings.forward 用实例属性校验通道数，必须同步，
-    # 否则会抛 "Expected 3 but got 6"；config 一并同步以保持一致。
+    # DINOv2 在前向时读取 patch_embeddings.num_channels。
     owner.embeddings.patch_embeddings.num_channels = in_channels
     if hasattr(owner, "config") and hasattr(owner.config, "num_channels"):
         owner.config.num_channels = in_channels
@@ -122,8 +116,6 @@ def build_detector(config, initialize=True):
                         gradient_checkpointing=True, num_select=100)
     args = populate_args(**model_config)
     model = build_model(args)
-    # 先接好融合结构、再加载权重：早融合会把补丁嵌入扩到 6 通道，
-    # 若顺序颠倒，6 通道的 checkpoint 会因模型仍是 3 通道而形状不符、无法加载。
     model.backbone[0] = FusionBackbone(model.backbone[0], config["multimodal"],
                                        early_fusion=config.get("fusion", "late") == "early")
     report = {"missing_keys": [], "unexpected_keys": []}
@@ -137,8 +129,6 @@ def build_detector(config, initialize=True):
             if target is None or tuple(target.shape) == tuple(value.shape):
                 filtered[key] = value
                 continue
-            # 特例：补丁嵌入的输入通道被早融合扩宽过（3→6）。把原有权重复制到前若干通道、
-            # 新增通道保持零初始化 —— 与 extend_patch_embed 一致，预训练 RGB 能力不丢。
             if (key.endswith("patch_embeddings.projection.weight")
                     and target.shape[0] == value.shape[0]
                     and tuple(target.shape[2:]) == tuple(value.shape[2:])
@@ -163,7 +153,6 @@ def build_detector(config, initialize=True):
     assert model.class_embed.out_features == 12
     assert all(head.out_features == 12 for head in model.transformer.enc_out_class_embed)
     if not report.get("class_head_loaded", False):
-        # 仅在分类头确实没被载入时，才应等于新初始化的 focal prior。
         assert torch.allclose(model.class_embed.bias,
                               torch.full_like(model.class_embed.bias, -math.log(99)))
     criterion, _ = build_criterion_and_postprocessors(args)
@@ -180,7 +169,8 @@ def output_rows(logits, boxes, geometry, size, threshold=.001):
     cls = indexes % 12
     selected = boxes.float()[indexes // 12]
     h, w, nh, nw, y, x = geometry
-    corners = torch.cat((selected[:, :2] - selected[:, 2:]/2, selected[:, :2] + selected[:, 2:]/2), 1) * size
+    scale = boxes.new_tensor([*size, *size]) if isinstance(size, (tuple, list)) else size
+    corners = torch.cat((selected[:, :2] - selected[:, 2:]/2, selected[:, :2] + selected[:, 2:]/2), 1) * scale
     corners[:, [0, 2]] = (corners[:, [0, 2]] - x) * w / nw
     corners[:, [1, 3]] = (corners[:, [1, 3]] - y) * h / nh
     corners[:, [0, 2]] = corners[:, [0, 2]].clamp(0, w)

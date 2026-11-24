@@ -2,8 +2,6 @@
 
     python -m scripts.run_experiment --config configs/rf48c-early1280.yaml \
         --out runs/formal/rf48b/run-early1280
-
-约束：不删除任何既有资产、不自动上传、一次只占一张卡。
 """
 import argparse
 import json

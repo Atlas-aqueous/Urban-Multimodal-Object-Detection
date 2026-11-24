@@ -78,8 +78,7 @@ def train(config, out_dir, split_manifest, stop_after=None, resume=None):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(Path(config["manifest"]).read_text())
-    # 清单未记录划分来源时（例如"全部数据训练"的清单）跳过一致性校验；
-    # 有来源时才要求与 --split-manifest 完全一致。
+    # 有固定划分时，训练入口和样本清单使用同一份划分文件。
     if manifest.get("split_sha256") and manifest["split_sha256"] != sha256(split_manifest):
         raise ValueError("Explicit split and sample manifest disagree")
     identity = {"config": config, "manifest_sha256": sha256(config["manifest"]),
@@ -121,7 +120,6 @@ def train(config, out_dir, split_manifest, stop_after=None, resume=None):
             return (step + 1) / warmup_steps
         span = total_steps - warmup_steps
         if span <= 0:
-            # 退化情形（总步数不超过 warmup，例如极短探针）：保持恒等，避免除零。
             return 1.0
         return .5 * (1 + math.cos(math.pi * (step - warmup_steps) / span))
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, factor)
@@ -189,8 +187,7 @@ def train(config, out_dir, split_manifest, stop_after=None, resume=None):
         if val_data is not None:
             seconds = predict(model, val_data, out_dir / "val-latest", config["imgsz"])
             metrics = evaluate(config["manifest"], out_dir / "val-latest", coco=epoch == 0)
-            # 2026-09-19 口径定案：官方 = Ultralytics 一族（三点偏差 -0.82/+1.21/-0.16）。
-            # 选模改用该口径，并在与最终打包一致的高置信度平台上取较优值。
+            # RF48 使用 Ultralytics AP，并取两个置信度工作点中的较高值。
             high = evaluate(config["manifest"], out_dir / "val-latest",
                             threshold=config.get("select_conf", .50))
             score = max(metrics["ultralytics_map"], high["ultralytics_map"])

@@ -1,0 +1,5 @@
+--- a/rfdetr/models/backbone/dinov2_with_windowed_attn.py
++++ b/rfdetr/models/backbone/dinov2_with_windowed_attn.py
+@@ -315 +315 @@
+-            windowed_pixel_tokens = pixel_tokens_with_pos_embed.reshape(batch_size * num_windows, num_h_patches_per_window, num_windows, num_h_patches_per_window, -1)
++            windowed_pixel_tokens = pixel_tokens_with_pos_embed.reshape(batch_size * num_windows, num_h_patches_per_window, num_windows, num_w_patches_per_window, -1)
